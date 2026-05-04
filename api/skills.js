@@ -10,14 +10,12 @@ const simpleIcons = require('simple-icons');
 const THEMES = {
   default: {
     cardBg: '#ffffff',
-    cardBorder: '#e1e4e8',
-    cardShadow: 'rgba(0, 0, 0, 0.05)',
-    titleColor: '#24292e',
-    subtitleColor: '#6a737d',
-    iconBgGradientStart: '#f6f8fa',
-    iconBgGradientEnd: '#e1e4e8',
-    iconLabelColor: '#24292e',
-    useIconColor: true, // colorize icons with their brand color
+    cardBorder: '#e8e8e8',
+    cardShadow: 'rgba(0, 0, 0, 0.06)',
+    titleColor: '#1a1a1a',
+    subtitleColor: '#9ca0a8',
+    iconLabelColor: '#6a737d',
+    useBrandLabel: true, // labels use brand color (like original widgetbox)
   },
   darkmode: {
     cardBg: '#0d1117',
@@ -25,10 +23,8 @@ const THEMES = {
     cardShadow: 'rgba(0, 0, 0, 0.4)',
     titleColor: '#f0f6fc',
     subtitleColor: '#8b949e',
-    iconBgGradientStart: '#161b22',
-    iconBgGradientEnd: '#21262d',
     iconLabelColor: '#c9d1d9',
-    useIconColor: true,
+    useBrandLabel: true,
   },
   light: {
     cardBg: '#ffffff',
@@ -36,10 +32,8 @@ const THEMES = {
     cardShadow: 'rgba(0, 0, 0, 0.08)',
     titleColor: '#1f2328',
     subtitleColor: '#656d76',
-    iconBgGradientStart: '#ffffff',
-    iconBgGradientEnd: '#f6f8fa',
     iconLabelColor: '#1f2328',
-    useIconColor: true,
+    useBrandLabel: true,
   },
   nautilus: {
     cardBg: '#1b262c',
@@ -47,10 +41,8 @@ const THEMES = {
     cardShadow: 'rgba(15, 76, 117, 0.4)',
     titleColor: '#bbe1fa',
     subtitleColor: '#7fb3d3',
-    iconBgGradientStart: '#0f4c75',
-    iconBgGradientEnd: '#3282b8',
     iconLabelColor: '#bbe1fa',
-    useIconColor: false,
+    useBrandLabel: true,
   },
   viridescent: {
     cardBg: '#0f3027',
@@ -58,10 +50,8 @@ const THEMES = {
     cardShadow: 'rgba(26, 88, 72, 0.4)',
     titleColor: '#a8e6cf',
     subtitleColor: '#7fc8a9',
-    iconBgGradientStart: '#1a5848',
-    iconBgGradientEnd: '#2d7d6e',
     iconLabelColor: '#a8e6cf',
-    useIconColor: false,
+    useBrandLabel: true,
   },
   carbon: {
     cardBg: '#161616',
@@ -69,10 +59,8 @@ const THEMES = {
     cardShadow: 'rgba(0, 0, 0, 0.6)',
     titleColor: '#f4f4f4',
     subtitleColor: '#a8a8a8',
-    iconBgGradientStart: '#262626',
-    iconBgGradientEnd: '#393939',
     iconLabelColor: '#f4f4f4',
-    useIconColor: true,
+    useBrandLabel: true,
   },
   serika: {
     cardBg: '#e1e1e3',
@@ -80,10 +68,8 @@ const THEMES = {
     cardShadow: 'rgba(50, 52, 55, 0.15)',
     titleColor: '#323437',
     subtitleColor: '#646669',
-    iconBgGradientStart: '#fafafa',
-    iconBgGradientEnd: '#e6e6e8',
     iconLabelColor: '#323437',
-    useIconColor: true,
+    useBrandLabel: true,
   },
   sunset: {
     cardBg: '#2d1b3d',
@@ -91,10 +77,8 @@ const THEMES = {
     cardShadow: 'rgba(255, 107, 107, 0.3)',
     titleColor: '#ffe66d',
     subtitleColor: '#ff9999',
-    iconBgGradientStart: '#ff6b6b',
-    iconBgGradientEnd: '#ee5a6f',
     iconLabelColor: '#ffe66d',
-    useIconColor: false,
+    useBrandLabel: true,
   },
 };
 
@@ -197,28 +181,59 @@ function escapeXml(str) {
 // ============================================================
 // SVG GENERATION
 // ============================================================
+// Lighten a hex color by mixing it with white. amount 0..1
+function lightenHex(hex, amount) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const lr = Math.round(r + (255 - r) * amount);
+  const lg = Math.round(g + (255 - g) * amount);
+  const lb = Math.round(b + (255 - b) * amount);
+  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
+}
+
+// Darken a hex color by mixing with black. amount 0..1
+function darkenHex(hex, amount) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const dr = Math.round(r * (1 - amount));
+  const dg = Math.round(g * (1 - amount));
+  const db = Math.round(b * (1 - amount));
+  return `#${dr.toString(16).padStart(2, '0')}${dg.toString(16).padStart(2, '0')}${db.toString(16).padStart(2, '0')}`;
+}
+
+let _gradientCounter = 0;
+
 function buildIconTile(icon, originalName, x, y, theme, includeName, tileSize, iconSize) {
-  const iconColor = theme.useIconColor ? `#${icon.hex}` : theme.iconLabelColor;
+  const brandHex = `#${icon.hex}`;
   const label = icon.title || originalName;
   const iconOffset = (tileSize - iconSize) / 2;
-
-  // Extract just the path data from the simple-icons SVG string
-  // simple-icons provides: { svg: '<svg ...><path d="..."/></svg>', path: '...', hex: '...', title: '...' }
   const pathData = icon.path || '';
 
-  const gradientId = `tile-grad-${x}-${y}-${Math.random().toString(36).slice(2, 8)}`;
+  // Brand-colored gradient on the tile (like the original widgetbox)
+  // Light tint -> brand color diagonal
+  const gradStart = lightenHex(`#${icon.hex}`, 0.35);
+  const gradEnd = brandHex;
+
+  // Icon is rendered in white on the colored tile for max contrast
+  const iconColor = '#ffffff';
+  const labelColor = theme.useBrandLabel ? brandHex : theme.iconLabelColor;
+
+  const gradientId = `g${_gradientCounter++}`;
 
   let tile = `
   <g transform="translate(${x},${y})">
     <defs>
       <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="${theme.iconBgGradientStart}" />
-        <stop offset="100%" stop-color="${theme.iconBgGradientEnd}" />
+        <stop offset="0%" stop-color="${gradStart}" />
+        <stop offset="100%" stop-color="${gradEnd}" />
       </linearGradient>
     </defs>
-    <rect width="${tileSize}" height="${tileSize}" rx="14" ry="14"
-          fill="url(#${gradientId})"
-          stroke="${theme.cardBorder}" stroke-width="0.5" />
+    <rect width="${tileSize}" height="${tileSize}" rx="16" ry="16"
+          fill="url(#${gradientId})" />
     <g transform="translate(${iconOffset},${iconOffset})">
       <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path d="${pathData}" fill="${iconColor}" />
@@ -226,13 +241,13 @@ function buildIconTile(icon, originalName, x, y, theme, includeName, tileSize, i
     </g>`;
 
   if (includeName) {
-    const labelY = tileSize + 18;
+    const labelY = tileSize + 20;
     tile += `
     <text x="${tileSize / 2}" y="${labelY}"
           font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-          font-size="11" font-weight="500"
+          font-size="12" font-weight="500"
           text-anchor="middle"
-          fill="${theme.iconLabelColor}">${escapeXml(label)}</text>`;
+          fill="${labelColor}">${escapeXml(label)}</text>`;
   }
 
   tile += `\n  </g>`;
@@ -250,7 +265,7 @@ function buildCategorySection(categoryKey, names, theme, options, startY, isFirs
 
   const padding = 32;
   // First section gets larger title block ("Skills" + subtitle), later sections only subtitle
-  const titleHeight = isFirst ? 70 : 40;
+  const titleHeight = isFirst ? 88 : 48;
 
   // Resolve all icons up front; skip unknown ones gracefully
   const resolved = names
@@ -268,19 +283,19 @@ function buildCategorySection(categoryKey, names, theme, options, startY, isFirs
   let svg = '';
   if (isFirst) {
     svg += `
-  <text x="${padding}" y="${startY + 28}"
+  <text x="${padding}" y="${startY + 38}"
         font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-        font-size="26" font-weight="700"
+        font-size="36" font-weight="700"
         fill="${theme.titleColor}">Skills</text>
-  <text x="${padding}" y="${startY + 52}"
+  <text x="${padding}" y="${startY + 64}"
         font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-        font-size="14" font-weight="400"
+        font-size="18" font-weight="400"
         fill="${theme.subtitleColor}">${escapeXml(CATEGORY_LABELS[categoryKey] || categoryKey)}</text>`;
   } else {
     svg += `
-  <text x="${padding}" y="${startY + 22}"
+  <text x="${padding}" y="${startY + 26}"
         font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-        font-size="14" font-weight="500"
+        font-size="18" font-weight="400"
         fill="${theme.subtitleColor}">${escapeXml(CATEGORY_LABELS[categoryKey] || categoryKey)}</text>`;
   }
 

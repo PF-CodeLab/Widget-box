@@ -1,0 +1,16 @@
+{
+  "name": "skillbox-api",
+  "version": "1.0.0",
+  "description": "Beautiful skill widget API powered by Simple Icons - 3000+ icons",
+  "main": "api/skills.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "simple-icons": "^13.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
